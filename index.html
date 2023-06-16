@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            font-size: 20px;
+            font-family :Arial, Helvetica, sans-serif;
+        }
+        label, input, select, button{
+            display: block;
+            margin: 10px 0;
+        }
+        hr {
+            width:100px;
+            border-top: 2px solid red;
+            margin-left: 0;
+        }
+        section{
+            padding: 50px;
+            display: flex;
+            justify-content: space-around;
+        }
+    </style>
+</head>
+<body>
+    <section>
+    <div id='items'>
+        <h3>Currently available</h3>
+        <hr>
+    </div>
+    <div id="new-item">
+        <h3>Add new item</h3>
+        <hr>
+        <label for ="name">Item name</label>
+        <input type="text" id="name">
+        <label for ="price">Price</label>
+        <input type="number" id="price">
+        <label for="category">Category</label>
+        <select id="category">
+        </select>
+        <button>Submit</button>
+        <br>
+        <p>Note : Reload the page the to see changes</p>
+    </div>
+    </section>
+    <script>
+    (() =>{
+        //declare variable
+        let db;
+        const dbConnection = window.indexedDB.open('grocery_store_db', 1);
+        dbConnection.onupgradeneeded = e =>{
+            //get the database
+            const db = e.target.result;
+            //create object stores
+            const categories = db.createObjectStore('categories', {keyPath:'categoryId', autoIncrement:true});
+            const items = db.createObjectStore('items', {keyPath:'itemId', autoIncrement:true});
+            categories.createIndex('categoryName', 'categoryName', {unique:true});
+            items.createIndex('itemName', 'itemName', {unique:false});
+            const categoriesArray = [{categoryName:'vegetables'}, {categoryName:'fruits'}, {categoryName:'spices'}, {categoryName:'household'}, {categoryName:'breads'}];
+            categoriesArray.forEach((c) => {categories.add(c)});
+        }
+        dbConnection.onsuccess = e =>{
+            //initialize database
+            db = e.target.result;
+            //render details of available grocery items when web page loads
+            const itemsCursor = db.transaction('items', 'readonly').objectStore('items').openCursor();
+            itemsCursor.onsuccess = e =>{
+                const cursor = e.target.result;
+                if (cursor) {
+                    const item = document.createElement('h5');
+                    item.innerText = `${cursor.value.itemName}  (Price : ${cursor.value.price})`;
+                    document.querySelector('#items').appendChild(item);
+                    cursor.continue();
+                }else {
+                    console.log('All items displayed');
+                }
+            }
+            //render options in the select element
+            const optionsCursor = db.transaction('categories', 'readonly').objectStore('categories').openCursor();
+            optionsCursor.onsuccess = e =>{
+                const cursor = e.target.result;
+                if (cursor) {
+                    const option = document.createElement('option');
+                    option.setAttribute('value', cursor.value.categoryName);
+                    option.text = cursor.value.categoryName;
+                    document.querySelector('#category').appendChild(option);
+                    cursor.continue();
+                }
+            }
+        }
+        document.querySelector('button').addEventListener('click', () =>{
+            const item = {};
+            item.itemName = document.querySelector('#name').value;
+            item.price = document.querySelector('#price').value;
+            //set the categoryId property
+            const selectCategory = db.transaction('categories', 'readonly').objectStore('categories').index('categoryName').get(document.querySelector('#category').value);
+            selectCategory.onsuccess = e =>{
+                item.categoryId = e.target.result.categoryId;
+                const addItem = db.transaction('items', 'readwrite').objectStore('items').put(item);
+                addItem.onsuccess = () =>{
+                    console.log('Item added');
+                }
+            }
+        });
+        })();
+    </script>
+</body>
+</html>
